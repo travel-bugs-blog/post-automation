@@ -73,31 +73,38 @@ ${trends.map((trend) => `- ${trend}`).join('\n')}
 *This is a placeholder post generated automatically based on the latest Google Trends.*
 `;
 
-  const filePath = path.join('/tmp', fileName);
+  logDebug('Generated post content:', content);
 
+  // Write the file locally for GitHub push
+  const filePath = path.join('/tmp', fileName);
   try {
     logDebug(`Writing post content to ${filePath}...`);
     fs.writeFileSync(filePath, content, 'utf8');
+  } catch (error) {
+    errorDebug(`Error writing file to ${filePath}:`, error.message);
+    throw error;
+  }
 
-    const encodedContent = Buffer.from(content).toString('base64');
+  const encodedContent = Buffer.from(content).toString('base64');
+  let sha = null;
 
-    // Check if the file already exists in the repo
-    let sha = null;
-    try {
-      logDebug('Checking if the file already exists in the repository...');
-      const { data } = await octokit.repos.getContent({
-        owner: REPO_OWNER,
-        repo: REPO_NAME,
-        path: `_posts/${fileName}`,
-        ref: BRANCH,
-      });
-      sha = data.sha;
-      logDebug(`File already exists. SHA: ${sha}`);
-    } catch (err) {
-      logDebug('File does not exist. Creating a new one...');
-    }
+  // Check if the file already exists in the repo
+  try {
+    logDebug('Checking if the file already exists in the repository...');
+    const { data } = await octokit.repos.getContent({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      path: `_posts/${fileName}`,
+      ref: BRANCH,
+    });
+    sha = data.sha;
+    logDebug(`File already exists. SHA: ${sha}`);
+  } catch (err) {
+    logDebug('File does not exist. Proceeding to create a new file...');
+  }
 
-    // Push to GitHub
+  // Push to GitHub
+  try {
     logDebug('Pushing the file to GitHub...');
     await octokit.repos.createOrUpdateFileContents({
       owner: REPO_OWNER,
@@ -108,13 +115,17 @@ ${trends.map((trend) => `- ${trend}`).join('\n')}
       branch: BRANCH,
       sha,
     });
-
     logDebug(`File '${fileName}' pushed to GitHub successfully.`);
-    return { message: `File '${fileName}' pushed to GitHub successfully.` };
   } catch (error) {
     errorDebug('Error pushing file to GitHub:', error.message);
     throw error;
   }
+
+  // Return both the generated content and the success message
+  return {
+    message: `File '${fileName}' successfully pushed to GitHub.`,
+    content,
+  };
 }
 
 // Main handler function
