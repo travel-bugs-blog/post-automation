@@ -23,20 +23,29 @@ const TOKEN = process.env.GITHUB_TOKEN || '';
 
 const octokit = (TOKEN !== '') ? new Octokit({ auth: TOKEN }) : null;
 
+if (!TOKEN || !REPO_OWNER || !REPO_NAME || !BRANCH) {
+  console.warn('Environment variables for GitHub configuration are missing.');
+}
+
 // Helper function to fetch Google Trends
 async function fetchGoogleTrends() {
+  debug(console.log, 'INFO', 'Fetching Google Trends...');
   try {
     const response = await googleTrends.dailyTrends({
       geo: 'US',
     });
+
+    debug(console.log, 'INFO', 'Google Trends response received.');
 
     const data = JSON.parse(response);
     const trends = data.default.trendingSearchesDays[0].trendingSearches.map(
       (search) => search.title.query
     );
 
+    debug(console.log, 'INFO', 'Extracted trends:', trends);
     return trends;
   } catch (error) {
+    debug(console.error, 'ERROR', 'Error fetching Google Trends:', error.message);
     throw new Error(`Error fetching Google Trends: ${error.message}`);
   }
 }
@@ -44,9 +53,11 @@ async function fetchGoogleTrends() {
 // Helper function to create and push a new post
 async function createAndPushPost(trends) {
   if (!octokit) {
-    return {message: 'Please provide ENV variables.'}
+    debug(console.warn, 'WARN', 'GitHub configuration is missing. Cannot push post.');
+    return { message: 'Please provide ENV variables.' };
   }
 
+  debug(console.log, 'INFO', 'Generating post content...');
   const today = new Date();
   const dateStr = today.toISOString().split('T')[0];
   const fileName = `google-trends-${dateStr}.md`;
@@ -67,7 +78,7 @@ ${trends.map((trend) => `- ${trend}`).join('\n')}
 
   const filePath = path.join('/tmp', fileName);
 
-  // Write file to temporary directory
+  debug(console.log, 'INFO', `Writing post content to ${filePath}...`);
   fs.writeFileSync(filePath, content, 'utf8');
 
   const encodedContent = Buffer.from(content).toString('base64');
@@ -75,6 +86,7 @@ ${trends.map((trend) => `- ${trend}`).join('\n')}
   // Check if the file already exists in the repo
   let sha = null;
   try {
+    debug(console.log, 'INFO', 'Checking if the file already exists in the repository...');
     const { data } = await octokit.repos.getContent({
       owner: REPO_OWNER,
       repo: REPO_NAME,
@@ -82,25 +94,33 @@ ${trends.map((trend) => `- ${trend}`).join('\n')}
       ref: BRANCH,
     });
     sha = data.sha;
+    debug(console.log, 'INFO', `File already exists. SHA: ${sha}`);
   } catch (err) {
-    // File does not exist, continue without sha
+    debug(console.warn, 'WARN', 'File does not exist. Creating a new one...');
   }
 
   // Push to GitHub
-  await octokit.repos.createOrUpdateFileContents({
-    owner: REPO_OWNER,
-    repo: REPO_NAME,
-    path: `_posts/${fileName}`,
-    message: `Add new Google Trends post: ${fileName}`,
-    content: encodedContent,
-    branch: BRANCH,
-    sha,
-  });
+  try {
+    debug(console.log, 'INFO', 'Pushing the file to GitHub...');
+    await octokit.repos.createOrUpdateFileContents({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      path: `_posts/${fileName}`,
+      message: `Add new Google Trends post: ${fileName}`,
+      content: encodedContent,
+      branch: BRANCH,
+      sha,
+    });
 
-  return { message: `File '${fileName}' pushed to GitHub successfully.` };
+    debug(console.log, 'INFO', `File '${fileName}' pushed to GitHub successfully.`);
+    return { message: `File '${fileName}' pushed to GitHub successfully.` };
+  } catch (error) {
+    debug(console.error, 'ERROR', 'Error pushing file to GitHub:', error.message);
+    throw error;
+  }
 }
 
-// This Appwrite function will be executed every time your function is triggered
+// Main handler function
 export default async ({ req, res, log, error }) => {
   const logDebug = (...args) => debug(log, 'INFO', ...args);
   const errorDebug = (...args) => debug(error, 'ERROR', ...args);
@@ -119,11 +139,13 @@ export default async ({ req, res, log, error }) => {
 
   // Test route
   router.get('/ping', (req, res) => {
+    logDebug('Ping endpoint hit.');
     res.json({ message: 'Pong' });
   });
 
   // Fetch trending terms
   router.get('/trends', async (req, res) => {
+    logDebug('Fetching trending terms...');
     try {
       const trends = await fetchGoogleTrends();
       res.json({ trends });
@@ -135,6 +157,7 @@ export default async ({ req, res, log, error }) => {
 
   // Generate and push a new post
   router.post('/generate-post', async (req, res) => {
+    logDebug('Generating and pushing new post...');
     try {
       const trends = await fetchGoogleTrends();
       const result = await createAndPushPost(trends);
@@ -147,9 +170,10 @@ export default async ({ req, res, log, error }) => {
 
   // Fetch user details
   router.get('/users/*id', async (req, res) => {
+    logDebug('Fetching user details...');
     try {
       const response = await users.get(req.params.id);
-      logDebug('User:', response);
+      logDebug('User fetched:', response);
       res.json(response);
     } catch (err) {
       errorDebug(`Could not get user: ${err.message}`);
@@ -159,9 +183,11 @@ export default async ({ req, res, log, error }) => {
 
   // Default route
   router.all('/*splat', (req, res) => {
+    logDebug('Default route hit.');
     res.json({ message: 'Not Found', splat: req.params.splat });
   });
 
   // Handle the request
+  logDebug('Handling request...');
   router.handleRequest(req, res);
 };
