@@ -16,12 +16,12 @@ const debug = (logFn, type, ...args) => {
 };
 
 // GitHub Configuration
-const REPO_OWNER = process.env.REPO_OWNER;
-const REPO_NAME = process.env.REPO_NAME;
-const BRANCH = process.env.BRANCH;
-const TOKEN = process.env.GITHUB_TOKEN;
+const REPO_OWNER = process.env.REPO_OWNER || '';
+const REPO_NAME = process.env.REPO_NAME || '';
+const BRANCH = process.env.BRANCH || '';
+const TOKEN = process.env.GITHUB_TOKEN || '';
 
-const octokit = new Octokit({ auth: TOKEN });
+const octokit = (TOKEN !== '') ? new Octokit({ auth: TOKEN }) : null;
 
 // Helper function to fetch Google Trends
 async function fetchGoogleTrends() {
@@ -43,6 +43,10 @@ async function fetchGoogleTrends() {
 
 // Helper function to create and push a new post
 async function createAndPushPost(trends) {
+  if (!octokit) {
+    return {message: 'Please provide ENV variables.'}
+  }
+
   const today = new Date();
   const dateStr = today.toISOString().split('T')[0];
   const fileName = `google-trends-${dateStr}.md`;
