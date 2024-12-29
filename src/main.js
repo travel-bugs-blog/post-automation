@@ -154,7 +154,7 @@ export default async ({ req, res, log, error }) => {
   });
 
   // Generate and push a new post
-  router.post('/generate-post', async (req, res) => {
+  router.get('/generate-post', async (req, res) => {
     logDebug('Generating and pushing new post...');
     try {
       const trends = await fetchGoogleTrends(logDebug, errorDebug);
