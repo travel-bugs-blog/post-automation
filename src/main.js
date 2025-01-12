@@ -57,13 +57,13 @@ async function createAndPushPost(trends, logDebug, errorDebug) {
   logDebug('Generating post content...');
   const today = new Date();
   const dateStr = today.toISOString().split('T')[0];
-  const fileName = `google-trends-${dateStr}.md`;
+  const fileName = `${dateStr}-google-trends.md`;
 
   const content = `---
 title: Google Trends for ${dateStr}
 date: ${today.toISOString()}
-categories: [Google Trends, Daily Trends]
-tags: [trending, google trends, blog]
+categories: [Weekly Trends]
+tags: [trending, blog]
 ---
 
 ## Top Trending Topics
