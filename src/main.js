@@ -164,8 +164,8 @@ export default async ({ req, res, log, error }) => {
     }
   });
 
-  // Generate and push a new post
-  router.get('/generate-post', async (req, res) => {
+  // Generate and push a new post when root is hit
+  router.get('/', async (req, res) => {
     logDebug('Generating and pushing new post...');
     try {
       const trends = await fetchGoogleTrends(logDebug, errorDebug);
@@ -174,19 +174,6 @@ export default async ({ req, res, log, error }) => {
       return res.json(result);
     } catch (err) {
       errorDebug(`Could not generate post: ${err.message}`);
-      return res.empty();
-    }
-  });
-
-  // Fetch user details
-  router.get('/users/*id', async (req, res) => {
-    logDebug('Fetching user details...');
-    try {
-      const response = await users.get(req.params.id);
-      logDebug('User fetched successfully:', response);
-      return res.json(response);
-    } catch (err) {
-      errorDebug(`Could not get user: ${err.message}`);
       return res.empty();
     }
   });
